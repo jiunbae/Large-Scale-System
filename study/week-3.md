@@ -91,11 +91,49 @@ graph TD;
 ```mermaid
 graph TD;
     A[Client 1] -->|Request| B[Client 1 Connection Web Socket Server]
-    B -->|Request| C[Web Socket Server]
-    C -->|Request| D[API Server]
-    D -->|Request| E[Cache]
-    E -->|Request| F[Database]
-    A2[Client 2] -->|Request| B2[Client 2 Connection Web Socket Server]
-    B2 --> |Publish 2| C2[Web Socket Server]
-
+    B -->|Request 1| C[Client 1 Channel]
+    C --> |Subscribe| E1[Client 2]
+    C --> |Subscribe| E2[Client 3]
+    C --> |Subscribe| E3[Client 4]
+    A2[Client 2] -->|Request| B2[Client 5 Connection Web Socket Server]
+    B2 --> |Publish  5| C2[Client 5 Channel]
+    C2 --> |Subscribe| E4[Client 6]
+    C2 --> |Subscribe| E5[Client 7]
 ```
+
+필요한 API를 나열해보자.
+웹소켓 프로토콜을 이용해 위치 정보 변경 내역을 송/수신한다. 이를 위해 다음과 같은 API가 필요하다.
+
+- 주기적인 위치 정보 갱신
+- 갱신된 친구 위치를 수신하는 API
+- 웹소켓 초기화
+- 새 친구 구독
+- 친구 구독 해지
+
+
+## Database Schema
+
+데이터베이스 스키마는 다음과 같이 구성할 수 있다.
+
+- User
+    - id
+    - name
+
+- 위치 정보 캐시
+    - 사용자 ID: 위치, 마지막 갱신 시각
+    - 매일 천만명의 위치 이동 이력을 저장해야하므로 **`막대한 연산 부하를 감당`**해야함
+    - TTL을 설정해서 위치 정보가 갱신될 때마다 TTL을 초기화 하여 데이터를 유지한다.
+
+- 위치 정보 이력
+    - RDB또는 NoSQL에 저장
+
+- Pub/sub 채널
+    - redis에서 pub/sub 채널(topic)을 만드는것은 매우 저렴하다.
+    - 새 채널은 구독하려는 채널이 없을 때 생성할 수 있다.
+    - 채널을 유지하기 위해서 구독자 관계 추적 (친구 관계) 가 필요하다.
+    - 주변 친구 기능을 사용하는 모든 사용자가 채널 하나씩 필요로하다면
+        - 필요한 채널 수는 $1,000,000,000 \times 10% = 100,000,000$개
+        - 가까운 친구를 추적하기 위해서 활성 상태를 사용하는 친구는 400명이라고 가정하면
+        - 채널당 400명의 구독자가 필요하다. 이 정보가 20바이트라고 치면.
+        - 모든 채널을 저장하는데에는 $100,000,000 \times 20 bytes \times 100 \text{활성 친구} = 200,000,000,000$ bytes = 200GB가 필요하다.
+    
