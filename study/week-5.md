@@ -232,6 +232,46 @@ graph TD
 이 경우는 메세지를 저장하면 바로 ACK를 보낼 수 있다. 이는 가장 빠른 처리 속도를 가질 수 있지만, 데이터 손실이 발생할 수 있다. metric, log와 같은 데이터 손실이 발생해도 상관없는 경우 사용할 수 있다.
 
 
+### Workflow
+
+위 내용을 종합하여 메세지 큐의 동작을 설명하면 아래와 같다.
+
+```mermaid
+sequenceDiagram
+    participant Producer
+    participant Broker
+    participant Topic
+    participant Partition
+    participant Consumer
+
+    %% Producer sends message to Broker
+    Producer->>Broker: Send Message
+
+    %% Broker forwards message to appropriate Topic
+    Broker->>Topic: Route Message to Topic
+
+    %% Topic assigns message to a specific Partition
+    Topic->>Partition: Assign to Partition
+
+    %% Partition stores the message
+    Partition->>Partition: Store Message
+
+    %% Partition sends ACK to Broker
+    Partition-->>Broker: ACK
+
+    %% Broker sends ACK to Producer
+    Broker-->>Producer: ACK
+
+    %% Consumer requests message from Partition
+    Consumer->>Partition: Request Message
+
+    %% Partition sends message to Consumer
+    Partition->>Consumer: Deliver Message
+
+    %% Consumer sends ACK to Partition after processing
+    Consumer-->>Partition: ACK
+```
+
 ## Message delivery (at-most-once, at-least-once, exactly-once)
 
 ### At-most-once
